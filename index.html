@@ -44,6 +44,14 @@ function _t(t){return t+.5|0}const yt=(t,e,i)=>Math.max(Math.min(t,i),e);functio
   th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);}
   th{color:var(--muted);font-weight:600;}
   .pct-bar{display:inline-block;height:6px;border-radius:3px;background:var(--red);vertical-align:middle;margin-right:6px;}
+  .count-bar-list{overflow-y:auto;max-height:480px;}
+  .count-bar-row{display:flex;align-items:center;gap:10px;padding:6px 2px;border-bottom:1px solid var(--border);}
+  .count-bar-row:last-child{border-bottom:none;}
+  .count-bar-label{width:170px;flex-shrink:0;font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .count-bar-track{flex:1;background:var(--panel-2);border-radius:4px;height:14px;position:relative;overflow:hidden;}
+  .count-bar-fill{height:100%;background:var(--red);border-radius:4px;}
+  .count-bar-value{width:100px;flex-shrink:0;text-align:right;font-size:13px;font-weight:700;color:var(--text);}
+  .count-bar-value .sub{font-size:11px;font-weight:400;color:var(--muted);}
   .footer-note{color:var(--muted);font-size:11px;margin-top:24px;text-align:center;}
 </style>
 </head>
@@ -74,18 +82,14 @@ function _t(t){return t+.5|0}const yt=(t,e,i)=>Math.max(Math.min(t,i),e);functio
 
   <div class="row">
     <div class="panel">
-      <h2>Absence % by Store</h2>
-      <div class="desc">Selected day — share of tracked riders marked absent</div>
-      <div style="overflow-y:auto;max-height:480px;">
-        <canvas id="storeChart"></canvas>
-      </div>
+      <h2>Absence by Store</h2>
+      <div class="desc">Selected day — total riders marked absent (% of tracked riders in brackets)</div>
+      <div id="storeChartList" class="count-bar-list"></div>
     </div>
     <div class="panel">
-      <h2>Absence % by Vendor</h2>
-      <div class="desc">Selected day — share of tracked riders marked absent</div>
-      <div style="overflow-y:auto;max-height:480px;">
-        <canvas id="vendorChart"></canvas>
-      </div>
+      <h2>Absence by Vendor</h2>
+      <div class="desc">Selected day — total riders marked absent (% of tracked riders in brackets)</div>
+      <div id="vendorChartList" class="count-bar-list"></div>
     </div>
   </div>
 
@@ -295,35 +299,24 @@ function renderDayViews(){
   `;
 
   const storeEntries = Object.entries(day.byStore).map(([name, v]) => ({name, absPct: pct(v.absent, v.total), total: v.total, absent: v.absent}))
-    .sort((a,b) => b.absPct - a.absPct);
+    .sort((a,b) => b.absent - a.absent);
   const vendorEntries = Object.entries(day.byVendor).map(([name, v]) => ({name, absPct: pct(v.absent, v.total), total: v.total, absent: v.absent}))
-    .sort((a,b) => b.absPct - a.absPct);
+    .sort((a,b) => b.absent - a.absent);
 
-  drawBar('storeChart', storeChart, storeEntries, c => storeChart = c);
-  drawBar('vendorChart', vendorChart, vendorEntries, c => vendorChart = c);
+  renderCountBar('storeChartList', storeEntries);
+  renderCountBar('vendorChartList', vendorEntries);
 }
 
-function drawBar(canvasId, existing, entries, assign){
-  if(existing) existing.destroy();
-  const canvas = document.getElementById(canvasId);
-  canvas.height = Math.max(240, entries.length * 28);
-  canvas.style.maxHeight = 'none';
-  const ctx = canvas.getContext('2d');
-  const chart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: entries.map(e => e.name),
-      datasets: [{ label: 'Absence %', data: entries.map(e => e.absPct), backgroundColor: '#e0392f' }]
-    },
-    options: {
-      indexAxis: 'y',
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { x: { beginAtZero: true, ticks: { color: '#6b7280' }, grid: { color: '#e0e2e8' } },
-                y: { ticks: { color: '#1a1d23', autoSkip: false, font: { size: 11 } }, grid: { display: false } } }
-    }
-  });
-  assign(chart);
+function renderCountBar(containerId, entries){
+  const container = document.getElementById(containerId);
+  const maxAbsent = Math.max(1, ...entries.map(e => e.absent));
+  container.innerHTML = entries.map(e => `
+    <div class="count-bar-row">
+      <div class="count-bar-label" title="${e.name}">${e.name}</div>
+      <div class="count-bar-track"><div class="count-bar-fill" style="width:${(e.absent / maxAbsent * 100).toFixed(1)}%"></div></div>
+      <div class="count-bar-value">${e.absent}<span class="sub"> (${e.absPct}%)</span></div>
+    </div>
+  `).join('');
 }
 
 function populateEntitySelect(){
